@@ -1,9 +1,27 @@
 import sys
 import os
+import numpy as np
+from scipy import ndimage
+import skimage
+import skimage.morphology
+import skimage.measure
+from subprocess import call
 from cytomine.models import Job
 from neubiaswg5 import CLASS_OBJSEG
 from neubiaswg5.helpers import NeubiasJob, prepare_data, upload_data, upload_metrics
 
+
+def label_objects(img, threshold=0.9, min_radius=3):
+    """
+    Threshold ilastik probability map and convert binary data to objects
+    """
+    img = img[:,:,1]
+    img[img>=threshold] = 1.0
+    img[img<threshold] = 0.0
+    img = skimage.measure.label(img).astype(np.uint16)
+    img = skimage.morphology.remove_small_objects(img, int(3*min_radius*min_radius))
+    
+    return img
 
 def main(argv):
     base_path = "{}".format(os.getenv("HOME")) # Mandatory for Singularity
@@ -11,19 +29,45 @@ def main(argv):
 
     with NeubiasJob.from_cli(argv) as nj:
         nj.job.update(status=Job.RUNNING, progress=0, statusComment="Initialisation...")
-        
         # 1. Prepare data for workflow
-        in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, nj, is_2d=True, **nj.flags)
+        in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, nj, **nj.flags)
 
-        # 2. Run image analysis workflow
+        temp_img = skimage.io.imread(os.path.join(in_path,"{}".format(in_imgs[0].filename)))
+        if len(temp_img.shape) > 2:
+            classification_project = "/app/RGBPixelClassification.ilp"
+        else:
+            classification_project = "/app/PixelClassification.ilp"
+
+        # 2. Run ilastik prediction
         nj.job.update(progress=25, statusComment="Launching workflow...")
+        shArgs = [
+            "/app/ilastik/run_ilastik.sh",
+            "--headless",
+            "--project="+classification_project,
+            "--export_source=Probabilities",
+            "--output_format=tif",
+            '--output_filename_format='+os.path.join(tmp_path,'{nickname}.tif')
+            ]
+        shArgs += [image.filepath for image in in_imgs]
+        
+        call_return = call(" ".join(shArgs), shell=True)
 
-        # 3. Upload data to BIAFLOWS
+        # Threshold probabilites
+        for image in in_imgs:
+            fn = os.path.join(tmp_path,"{}".format(image.filename))
+            outfn = os.path.join(out_path,"{}".format(image.filename))
+            img = skimage.io.imread(fn)
+            img = label_objects(img, nj.parameters.probability_threshold, nj.parameters.min_radius)
+            skimage.io.imsave(outfn, img)
+
+        # 3. Upload data to Cytomine
         upload_data(problem_cls, nj, in_imgs, out_path, **nj.flags, monitor_params={
             "start": 60, "end": 90, "period": 0.1,
             "prefix": "Extracting and uploading polygons from masks"})
         
         # 4. Compute and upload metrics
+        import pdb
+        pdb.set_trace()
         nj.job.update(progress=90, statusComment="Computing and uploading metrics...")
         upload_metrics(problem_cls, nj, in_imgs, gt_path, out_path, tmp_path, **nj.flags)
 
