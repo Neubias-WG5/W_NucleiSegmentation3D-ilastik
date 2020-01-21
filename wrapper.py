@@ -11,15 +11,15 @@ from neubiaswg5 import CLASS_OBJSEG
 from neubiaswg5.helpers import NeubiasJob, prepare_data, upload_data, upload_metrics
 
 
-def label_objects(img, threshold=0.9, min_radius=3):
+def label_objects(img, threshold=0.9):
     """
     Threshold ilastik probability map and convert binary data to objects
     """
-    img = img[:,:,1]
+    img = img[:,1,:,:]
     img[img>=threshold] = 1.0
     img[img<threshold] = 0.0
     img = skimage.measure.label(img).astype(np.uint16)
-    img = skimage.morphology.remove_small_objects(img, int(3*min_radius*min_radius))
+    #img = skimage.morphology.remove_small_objects(img, int(3*min_radius*min_radius))
     
     return img
 
@@ -33,10 +33,7 @@ def main(argv):
         in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, nj, **nj.flags)
 
         temp_img = skimage.io.imread(os.path.join(in_path,"{}".format(in_imgs[0].filename)))
-        if len(temp_img.shape) > 2:
-            classification_project = "/app/RGBPixelClassification.ilp"
-        else:
-            classification_project = "/app/PixelClassification.ilp"
+        classification_project = "/app/PixelClassification3D.ilp"
 
         # 2. Run ilastik prediction
         nj.job.update(progress=25, statusComment="Launching workflow...")
@@ -45,8 +42,8 @@ def main(argv):
             "--headless",
             "--project="+classification_project,
             "--export_source=Probabilities",
-            "--output_format=tif",
-            '--output_filename_format='+os.path.join(tmp_path,'{nickname}.tif')
+            "--output_format='multipage tiff'",
+            '--output_filename_format='+os.path.join(tmp_path,'{nickname}.tiff')
             ]
         shArgs += [image.filepath for image in in_imgs]
         
@@ -54,10 +51,10 @@ def main(argv):
 
         # Threshold probabilites
         for image in in_imgs:
-            fn = os.path.join(tmp_path,"{}".format(image.filename))
+            fn = os.path.join(tmp_path,"{}.tiff".format(image.filename[:-4]))
             outfn = os.path.join(out_path,"{}".format(image.filename))
             img = skimage.io.imread(fn)
-            img = label_objects(img, nj.parameters.probability_threshold, nj.parameters.min_radius)
+            img = label_objects(img, nj.parameters.probability_threshold)
             skimage.io.imsave(outfn, img)
 
         # 3. Upload data to Cytomine
@@ -66,8 +63,6 @@ def main(argv):
             "prefix": "Extracting and uploading polygons from masks"})
         
         # 4. Compute and upload metrics
-        import pdb
-        pdb.set_trace()
         nj.job.update(progress=90, statusComment="Computing and uploading metrics...")
         upload_metrics(problem_cls, nj, in_imgs, gt_path, out_path, tmp_path, **nj.flags)
 
