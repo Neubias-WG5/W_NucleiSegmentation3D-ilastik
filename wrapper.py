@@ -58,7 +58,7 @@ def main(argv):
             skimage.io.imsave(outfn, img)
 
         # 3. Upload data to Cytomine
-        upload_data(problem_cls, nj, in_imgs, out_path, **nj.flags, monitor_params={
+        upload_data(problem_cls, nj, in_imgs, out_path, is_2d=False, **nj.flags, monitor_params={
             "start": 60, "end": 90, "period": 0.1,
             "prefix": "Extracting and uploading polygons from masks"})
         
