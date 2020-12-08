@@ -8,7 +8,7 @@ import skimage.measure
 from subprocess import call
 from cytomine.models import Job
 from biaflows import CLASS_OBJSEG
-from biaflows.helpers import NeubiasJob, prepare_data, upload_data, upload_metrics
+from biaflows.helpers import BiaflowsJob, prepare_data, upload_data, upload_metrics
 
 
 def label_objects(img, threshold=0.9):
@@ -27,7 +27,7 @@ def main(argv):
     base_path = "{}".format(os.getenv("HOME")) # Mandatory for Singularity
     problem_cls = CLASS_OBJSEG
 
-    with Biaflows
+    with BiaflowsJob
     Job.from_cli(argv) as nj:
         nj.job.update(status=Job.RUNNING, progress=0, statusComment="Initialisation...")
         # 1. Prepare data for workflow
