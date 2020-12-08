@@ -7,8 +7,8 @@ import skimage.morphology
 import skimage.measure
 from subprocess import call
 from cytomine.models import Job
-from neubiaswg5 import CLASS_OBJSEG
-from neubiaswg5.helpers import NeubiasJob, prepare_data, upload_data, upload_metrics
+from biaflows import CLASS_OBJSEG
+from biaflows.helpers import NeubiasJob, prepare_data, upload_data, upload_metrics
 
 
 def label_objects(img, threshold=0.9):
@@ -27,7 +27,8 @@ def main(argv):
     base_path = "{}".format(os.getenv("HOME")) # Mandatory for Singularity
     problem_cls = CLASS_OBJSEG
 
-    with NeubiasJob.from_cli(argv) as nj:
+    with Biaflows
+    Job.from_cli(argv) as nj:
         nj.job.update(status=Job.RUNNING, progress=0, statusComment="Initialisation...")
         # 1. Prepare data for workflow
         in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, nj, **nj.flags)
