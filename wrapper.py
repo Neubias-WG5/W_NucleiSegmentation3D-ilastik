@@ -27,8 +27,7 @@ def main(argv):
     base_path = "{}".format(os.getenv("HOME")) # Mandatory for Singularity
     problem_cls = CLASS_OBJSEG
 
-    with BiaflowsJob
-    Job.from_cli(argv) as nj:
+    with BiaflowsJob.from_cli(argv) as nj:
         nj.job.update(status=Job.RUNNING, progress=0, statusComment="Initialisation...")
         # 1. Prepare data for workflow
         in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, nj, **nj.flags)
